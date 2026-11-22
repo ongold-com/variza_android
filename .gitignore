@@ -38,3 +38,5 @@ google-services.json
 
 # Local signing key + passwords - never commit
 keystore/
+
+signing-secrets.txt

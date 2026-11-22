@@ -22,13 +22,29 @@ object PhoneMatch {
 
     private fun hasLetters(s: String): Boolean = s.any { it.isLetter() }
 
+    /** Lower-cases and unifies Persian/Arabic letter variants; drops spaces, ZWNJ and punctuation. */
+    fun normalizeName(s: String): String {
+        val sb = StringBuilder()
+        for (c in s.lowercase()) {
+            val x = when (c) {
+                'ي', 'ى' -> 'ی'
+                'ك' -> 'ک'
+                'ۀ', 'ة' -> 'ه'
+                else -> c
+            }
+            if (x.isLetterOrDigit()) sb.append(x)
+        }
+        return sb.toString()
+    }
+
     fun matches(sender: String, entry: String): Boolean {
         val s = sender.trim()
         val e = entry.trim()
         if (s.isEmpty() || e.isEmpty()) return false
 
         if (hasLetters(s) || hasLetters(e)) {
-            return s.equals(e, ignoreCase = true)
+            val ns = normalizeName(s)
+            return ns.isNotEmpty() && ns == normalizeName(e)
         }
 
         val sd = digits(s)
@@ -39,5 +55,9 @@ object PhoneMatch {
     }
 
     fun matchesAny(sender: String, entries: List<String>): Boolean =
-        entries.any { matches(sender, it) }
+        findMatch(sender, entries) != null
+
+    /** Returns the list entry that matches this sender, or null. */
+    fun findMatch(sender: String, entries: List<String>): String? =
+        entries.firstOrNull { matches(sender, it) }
 }

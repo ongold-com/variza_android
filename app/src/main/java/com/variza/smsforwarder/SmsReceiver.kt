@@ -18,7 +18,6 @@ class SmsReceiver : BroadcastReceiver() {
 
         val settings = Settings(context)
         val numbers = settings.numbers()
-        if (numbers.isEmpty()) return
 
         val subId = intent.getIntExtra("subscription", -1)
         val slot = listOf("slot", "simSlot", "android.telephony.extra.SLOT_INDEX")
@@ -37,7 +36,10 @@ class SmsReceiver : BroadcastReceiver() {
         val store = MessageStore.get(context)
         var queued = false
         for ((from, body) in bySender) {
-            if (PhoneMatch.matchesAny(from, numbers)) {
+            val matched = PhoneMatch.findMatch(from, numbers)
+            // Log every incoming SMS so the user can see the exact sender name/number.
+            store.insertIncoming(from, body.toString().take(80), ts, slot, matched)
+            if (matched != null) {
                 store.insertPending(from, body.toString(), ts, slot, subId)
                 queued = true
             }

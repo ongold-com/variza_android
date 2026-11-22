@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.variza.smsforwarder.ForwarderService
+import com.variza.smsforwarder.data.IncomingRecord
 import com.variza.smsforwarder.data.MessageStore
 import com.variza.smsforwarder.data.Settings
 import com.variza.smsforwarder.data.SmsRecord
@@ -93,6 +94,7 @@ private fun MainScreen() {
     var info by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
     var log by remember { mutableStateOf<List<SmsRecord>>(emptyList()) }
+    var incoming by remember { mutableStateOf<List<IncomingRecord>>(emptyList()) }
     var smsOk by remember { mutableStateOf(hasSmsPermission(ctx)) }
     var batteryOk by remember { mutableStateOf(ignoringBattery(ctx)) }
 
@@ -114,6 +116,7 @@ private fun MainScreen() {
     LaunchedEffect(Unit) {
         while (true) {
             log = withContext(Dispatchers.IO) { store.recent(50) }
+            incoming = withContext(Dispatchers.IO) { store.recentIncoming(100) }
             smsOk = hasSmsPermission(ctx)
             batteryOk = ignoringBattery(ctx)
             delay(2000)
@@ -218,7 +221,24 @@ private fun MainScreen() {
 
         item {
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text("آخرین پیام‌ها", style = MaterialTheme.typography.titleMedium)
+            Text("گزارش همه‌ی پیامک‌های دریافتی", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "هر پیامکی که به گوشی می‌رسد (از هر فرستنده‌ای) اینجا با نام یا شماره‌ی دقیق فرستنده دیده می‌شود. " +
+                    "اگر فرستنده با لیست نخواند، می‌توانی با یک دکمه همان نام دقیق را به لیست اضافه کنی.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (incoming.isEmpty()) Text("هنوز پیامکی دریافت نشده.")
+        }
+
+        items(incoming) { r ->
+            IncomingRow(r, numbers) {
+                if (settings.addNumber(r.sender)) numbers = settings.numbers()
+            }
+        }
+
+        item {
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text("وضعیت ارسال به بک‌اند", style = MaterialTheme.typography.titleMedium)
             if (log.isEmpty()) Text("هنوز پیامی دریافت نشده.")
         }
 
@@ -260,6 +280,38 @@ private fun LogRow(m: SmsRecord) {
                 color = if (m.status == "SENT") MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.error,
             )
+        }
+    }
+}
+
+@Composable
+private fun IncomingRow(r: IncomingRecord, numbers: List<String>, onAdd: () -> Unit) {
+    val fmt = remember { SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.US) }
+    val matched = r.matchedEntry != null
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text("فرستنده: ${r.sender}", style = MaterialTheme.typography.titleSmall)
+            Text(r.preview, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                fmt.format(Date(r.receivedAt)) + (if (r.simSlot >= 0) " • سیم ${r.simSlot + 1}" else ""),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (matched) {
+                Text(
+                    "✓ با «${r.matchedEntry}» از لیست مطابقت دارد و ارسال می‌شود",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                val inList = if (numbers.isEmpty()) "لیست خالی است"
+                else "در لیست داری: " + numbers.joinToString("، ") { "«$it»" }
+                Text(
+                    "✗ ارسال نشد: نام/شماره‌ی این فرستنده «${r.sender}» است و با هیچ‌کدام از لیست نمی‌خواند. $inList",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                OutlinedButton(onClick = onAdd) { Text("افزودن «${r.sender}» به لیست") }
+            }
         }
     }
 }

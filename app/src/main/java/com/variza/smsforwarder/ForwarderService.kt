@@ -132,7 +132,10 @@ class ForwarderService : Service() {
                     for (m in list) {
                         val json = Sender.buildJson(m.sender, m.body, m.receivedAt, m.simSlot, m.subscriptionId)
                         val r = Sender.send(url, json)
-                        if (r.ok) store.markSent(m.id) else {
+                        if (r.ok) {
+                            store.markSent(m.id)
+                            com.variza.smsforwarder.util.Notifier.notifySent(context, m)
+                        } else {
                             store.markFailed(m.id, r.message)
                             break
                         }

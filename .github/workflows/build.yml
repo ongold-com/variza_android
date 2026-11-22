@@ -1,0 +1,73 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Create .env from secrets
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          API_KEY_HEADER: ${{ secrets.API_KEY_HEADER }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "::warning::Secret API_KEY is not set - the APK will send requests WITHOUT an API key header."
+          fi
+          {
+            echo "API_KEY=$API_KEY"
+            echo "API_KEY_HEADER=${API_KEY_HEADER:-X-API-Key}"
+          } > .env
+
+      - name: Use custom keystore from secrets (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD_S: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_S: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD_S: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/custom.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/custom.jks" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_S" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS_S" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD_S" >> "$GITHUB_ENV"
+          else
+            echo "No KEYSTORE_BASE64 secret: falling back to debug signing (see docs/04-signing-key.md)"
+          fi
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Build signed release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk variza-sms.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: variza-sms-apk
+          path: variza-sms.apk
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: variza-sms.apk

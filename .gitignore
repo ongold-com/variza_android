@@ -31,3 +31,10 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Secrets (API key for the backend) - never commit
+.env
+!.env.example
+
+# Local signing key + passwords - never commit
+keystore/

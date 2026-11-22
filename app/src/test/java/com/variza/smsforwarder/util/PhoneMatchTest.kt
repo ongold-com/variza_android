@@ -32,6 +32,17 @@ class PhoneMatchTest {
         assertFalse(PhoneMatch.matches("BankMelli", "BankSepah"))
     }
 
+    @Test fun persianNamesIgnoreSpacesAndArabicLetters() {
+        assertTrue(PhoneMatch.matches("بانک رسالت", "بانکرسالت"))
+        assertTrue(PhoneMatch.matches("عليرضا", "علیرضا"))
+        assertFalse(PhoneMatch.matches("رسالت", "علی"))
+    }
+
+    @Test fun findMatchReturnsEntry() {
+        assertEquals("0912 123 4567", PhoneMatch.findMatch("+989121234567", listOf("Bank", "0912 123 4567")))
+        assertEquals(null, PhoneMatch.findMatch("X", listOf("Y")))
+    }
+
     @Test fun emptyNeverMatches() {
         assertFalse(PhoneMatch.matches("", "09121234567"))
         assertFalse(PhoneMatch.matchesAny("09121234567", emptyList()))

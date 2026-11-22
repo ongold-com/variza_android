@@ -18,9 +18,19 @@ data class SmsRecord(
     val sentAt: Long?,
 )
 
+/** One received SMS (from any sender) with the result of comparing it to the list. */
+data class IncomingRecord(
+    val id: Long,
+    val sender: String,
+    val preview: String,
+    val receivedAt: Long,
+    val simSlot: Int,
+    val matchedEntry: String?, // null = not in the list, so not forwarded
+)
+
 /** Small SQLite queue + log of forwarded messages. */
 class MessageStore private constructor(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -37,9 +47,60 @@ class MessageStore private constructor(context: Context) :
                 sent_at INTEGER
             )"""
         )
+        createIncoming(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+    private fun createIncoming(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS incoming (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender TEXT NOT NULL,
+                preview TEXT NOT NULL,
+                received_at INTEGER NOT NULL,
+                sim_slot INTEGER NOT NULL,
+                matched_entry TEXT
+            )"""
+        )
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) createIncoming(db)
+    }
+
+    @Synchronized
+    fun insertIncoming(sender: String, preview: String, receivedAt: Long, simSlot: Int, matched: String?) {
+        val v = ContentValues().apply {
+            put("sender", sender)
+            put("preview", preview)
+            put("received_at", receivedAt)
+            put("sim_slot", simSlot)
+            if (matched != null) put("matched_entry", matched) else putNull("matched_entry")
+        }
+        writableDatabase.insert("incoming", null, v)
+        writableDatabase.execSQL(
+            "DELETE FROM incoming WHERE id NOT IN (SELECT id FROM incoming ORDER BY id DESC LIMIT 100)"
+        )
+    }
+
+    @Synchronized
+    fun recentIncoming(limit: Int = 100): List<IncomingRecord> {
+        val out = ArrayList<IncomingRecord>()
+        readableDatabase.query("incoming", null, null, null, null, null, "id DESC", limit.toString()).use { c ->
+            while (c.moveToNext()) {
+                out.add(
+                    IncomingRecord(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        sender = c.getString(c.getColumnIndexOrThrow("sender")),
+                        preview = c.getString(c.getColumnIndexOrThrow("preview")),
+                        receivedAt = c.getLong(c.getColumnIndexOrThrow("received_at")),
+                        simSlot = c.getInt(c.getColumnIndexOrThrow("sim_slot")),
+                        matchedEntry = c.getString(c.getColumnIndexOrThrow("matched_entry")),
+                    )
+                )
+            }
+        }
+        return out
+    }
 
     @Synchronized
     fun insertPending(sender: String, body: String, receivedAt: Long, simSlot: Int, subId: Int): Long {

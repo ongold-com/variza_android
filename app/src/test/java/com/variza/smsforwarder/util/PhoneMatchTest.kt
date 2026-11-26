@@ -56,4 +56,17 @@ class PhoneMatchTest {
         assertEquals(1, o.getInt("simSlot"))
         assertEquals(5, o.getInt("subscriptionId"))
     }
+
+    @Test fun backendResultMustBeParsedAndMatched() {
+        val ok = Sender.checkResults(
+            """{"results":[{"parsed":true,"matched":true,"duplicate":false,"code":"1","amount":71156,"bankId":"resalat"}],"matchedCode":"1"}"""
+        )
+        assertTrue(ok.ok)
+        assertEquals(71156L, ok.amount)
+        assertEquals("resalat", ok.bankId)
+        assertFalse(Sender.checkResults("""{"results":[{"parsed":true,"matched":false}]}""").ok)
+        assertFalse(Sender.checkResults("""{"results":[{"parsed":false,"matched":true}]}""").ok)
+        assertFalse(Sender.checkResults("""{"results":[]}""").ok)
+        assertFalse(Sender.checkResults("not json").ok)
+    }
 }

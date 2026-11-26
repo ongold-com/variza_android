@@ -8,7 +8,7 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         try {
-            ForwarderService.start(context)
+            if (com.variza.smsforwarder.data.Settings(context).isLoggedIn) ForwarderService.start(context)
         } catch (_: Exception) {
         }
     }

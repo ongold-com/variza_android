@@ -43,6 +43,12 @@ class ForwarderService : Service() {
             startForeground(NOTIF_ID, notification)
         }
 
+        if (!Settings(this).isLoggedIn) {
+            // Not logged in: nothing to do.
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (!running) {
             running = true
             worker = Thread({ loop() }, "sms-forwarder").also { it.start() }
@@ -113,6 +119,10 @@ class ForwarderService : Service() {
 
         private val sendLock = Any()
 
+        fun stop(context: Context) {
+            context.stopService(Intent(context, ForwarderService::class.java))
+        }
+
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, ForwarderService::class.java))
         }
@@ -123,7 +133,8 @@ class ForwarderService : Service() {
                 val store = MessageStore.get(context)
                 val list = store.pending()
                 if (list.isEmpty()) return
-                val url = Settings(context).backendUrl
+                val token = Settings(context).deviceToken
+                if (token.isBlank()) return
 
                 val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
                 val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "variza:send")
@@ -131,10 +142,10 @@ class ForwarderService : Service() {
                 try {
                     for (m in list) {
                         val json = Sender.buildJson(m.sender, m.body, m.receivedAt, m.simSlot, m.subscriptionId)
-                        val r = Sender.send(url, json)
+                        val r = Sender.send(token, json)
                         if (r.ok) {
                             store.markSent(m.id)
-                            com.variza.smsforwarder.util.Notifier.notifySent(context, m)
+                            com.variza.smsforwarder.util.Notifier.notifySent(context, m, r)
                         } else {
                             store.markFailed(m.id, r.message)
                             break

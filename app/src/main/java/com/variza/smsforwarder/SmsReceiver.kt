@@ -17,6 +17,7 @@ class SmsReceiver : BroadcastReceiver() {
         if (parts.isEmpty()) return
 
         val settings = Settings(context)
+        if (!settings.isLoggedIn) return
         val numbers = settings.numbers()
 
         val subId = intent.getIntExtra("subscription", -1)

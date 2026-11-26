@@ -8,9 +8,25 @@ class Settings(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    var backendUrl: String
-        get() = prefs.getString("backend_url", "") ?: ""
-        set(v) = prefs.edit().putString("backend_url", v.trim()).apply()
+    // ---- Login session (kept permanently until logout) ----
+    val deviceToken: String get() = prefs.getString("device_token", "") ?: ""
+    val userName: String get() = prefs.getString("user_name", "") ?: ""
+    val userPhone: String get() = prefs.getString("user_phone", "") ?: ""
+    val isLoggedIn: Boolean get() = deviceToken.isNotBlank()
+
+    fun saveLogin(token: String, deviceId: Long, fullName: String, phone: String) {
+        prefs.edit()
+            .putString("device_token", token)
+            .putLong("device_id", deviceId)
+            .putString("user_name", fullName)
+            .putString("user_phone", phone)
+            .apply()
+    }
+
+    /** Logout: wipes the session and the number list. */
+    fun clearAll() {
+        prefs.edit().clear().commit()
+    }
 
     fun numbers(): List<String> {
         val raw = prefs.getString("numbers", "[]") ?: "[]"

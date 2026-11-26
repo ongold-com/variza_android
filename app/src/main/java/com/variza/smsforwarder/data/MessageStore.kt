@@ -116,6 +116,12 @@ class MessageStore private constructor(context: Context) :
     }
 
     @Synchronized
+    fun clearAll() {
+        writableDatabase.execSQL("DELETE FROM messages")
+        writableDatabase.execSQL("DELETE FROM incoming")
+    }
+
+    @Synchronized
     fun pending(): List<SmsRecord> = query("status = 'PENDING'", "id ASC", null)
 
     @Synchronized

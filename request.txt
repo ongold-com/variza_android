@@ -1,0 +1,51 @@
+//request login
+val client = OkHttpClient()
+val mediaType = "application/json".toMediaType()
+val body = "{\n    \"identifier\":\"09059735480\",\n    \"password\":\"19971400!Mv\",\n    \"label\":\"phone\"\n}".toRequestBody(mediaType)
+val request = Request.Builder()
+  .url("https://variz.aongold.ir/api/v1/app/login")
+  .post(body)
+  .addHeader("X-API-Key", env.API_KEY)
+  .addHeader("Content-Type", "application/json")
+  .build()
+val response = client.newCall(request).execute()
+//response success
+{
+    "deviceToken": "token",
+    "tokenType": "Bearer",
+    "deviceId": 3,
+    "user": {
+        "id": 2,
+        "fullName": "علیرضا شادی",
+        "phone": "09059735480"
+    }
+}
+
+
+//request send sms
+val client = OkHttpClient()
+val mediaType = "application/json".toMediaType()
+val body = "{\n    \"from\": \"+989382130767\",\n    \"body\": \"10.4483997.1\\n+711,560\\n09/06_23:29\\nمانده: 1,390,048,475\",\n    \"receivedAt\": 1795723170578,\n    \"simSlot\": 1,\n    \"subscriptionId\": 2\n}\n".toRequestBody(mediaType)
+val request = Request.Builder()
+  .url("https://variz.aongold.ir/api/v1/app/messages")
+  .post(body)
+  .addHeader("X-API-Key", env.API_KEY)
+  .addHeader("Content-Type", "application/json")
+  .addHeader("Authorization", "Bearer $deviceToken")
+  .build()
+val response = client.newCall(request).execute()
+
+//response success
+{
+    "results": [
+        {
+            "parsed": true,
+            "matched": true,
+            "duplicate": false,
+            "code": "2611262326260403",
+            "amount": 71156,
+            "bankId": "resalat"
+        }
+    ],
+    "matchedCode": "2611262326260403"
+}
